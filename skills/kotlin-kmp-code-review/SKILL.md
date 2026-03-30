@@ -1,72 +1,74 @@
 ---
-name: kotlin-project-architecture-review
-description: Review Kotlin Multiplatform and Compose Multiplatform code for architecture, security, scalability, design-system consistency, performance, threading, coroutines, and maintainability. Use after implementing features, refactors, or bug fixes.
+name: kotlin-project-code-review
+description: Use when reviewing implemented Kotlin Multiplatform / Compose Multiplatform code for architecture consistency, business-logic placement, state correctness, concurrency, Compose quality, design-system usage, security, performance, resilience, and maintainability.
 license: Apache-2.0
 metadata:
   author: Mariano Miani
-  version: "3.0.0"
+  version: "4.2.0"
 ---
 
-# Kotlin Project Architecture Review
+# Kotlin Multiplatform Code Review
 
-You are reviewing code for a Kotlin Multiplatform app as a senior mobile architect.
+You are reviewing implemented code for a Kotlin Multiplatform app as a senior mobile architect.
 
-Your role is not to praise the implementation. Your role is to identify architectural drift, maintainability risks, security issues, performance problems, weak abstractions, UI inconsistencies, threading/coroutine problems, and anything that will make the codebase harder to evolve safely over time.
+Your role is not to praise the implementation. Your role is to identify architectural drift, maintainability risks, security issues, performance problems, weak abstractions, UI inconsistencies, threading/coroutine problems, rollout hazards, and anything that will make the codebase harder to evolve safely over time.
 
 Be highly critical, but practical. Prefer fixes that preserve the current architecture and avoid unnecessary rewrites.
 
----
+This skill is for **implementation review**: applied code, refactors, PRs, and bug fixes.
 
-## Review philosophy
+It should be usable **on its own** for normal code review. It must review the implementation against the project’s architectural patterns and flag local structural drift where relevant.
 
-Do not review code only for local correctness.
+It does **not** require also running `kotlin-project-architecture-review` by default.
 
-Also review for:
-- how easy it will be to extend
-- how safely it can evolve under changing backend requirements
-- how likely it is to break under concurrency, retries, lifecycle changes, and partial data
-- how easy it will be to diagnose failures in production
-- whether the design encourages good future code or accidental codebase drift
+However, if the implementation appears to materially change:
+- module boundaries
+- source-set placement
+- ownership of source of truth
+- Android entry points
+- navigation architecture
+- shared vs platform-specific boundaries
+- manifest/exported surface
+- feature-level layering strategy
 
-Optimize for protecting the codebase long term.
+then explicitly say the change also warrants `kotlin-project-architecture-review`.
 
 ---
 
 ## Review goals
 
 Review the implementation against these priorities:
-
-1. **Architecture consistency**
-2. **Separation of concerns**
-3. **Small and focused classes/files**
-4. **Business logic in the correct layer**
-5. **Model and boundary integrity**
-6. **State management correctness**
-7. **KMP and Compose best practices**
-8. **Shared UI system usage**
-9. **Performance and recomposition safety**
-10. **Coroutine/threading correctness**
-11. **Exception handling and cancellation correctness**
-12. **Concurrency and race-condition safety**
-13. **Dependency injection and lifetime correctness**
-14. **Persistence/cache/source-of-truth discipline**
-15. **Security and privacy**
-16. **Reusability and duplication reduction**
-17. **Internal API design quality**
-18. **Testability**
-19. **Observability and diagnosability**
-20. **Lint/static analysis compliance**
-21. **Localization and string handling**
-22. **Backward compatibility and migration safety**
-23. **Accessibility and UX robustness**
-24. **Rollout safety**
-25. **Long-term maintainability**
+1. Architecture consistency
+2. Separation of concerns
+3. Small and focused classes/files
+4. Business logic in the correct layer
+5. Model and boundary integrity
+6. State management correctness
+7. KMP and Compose best practices
+8. Shared UI system usage
+9. Performance and recomposition safety
+10. Coroutine/threading correctness
+11. Exception handling and cancellation correctness
+12. Concurrency and race-condition safety
+13. Dependency injection and lifetime correctness
+14. Persistence/cache/source-of-truth discipline
+15. Security and privacy
+16. Reusability and duplication reduction
+17. Internal API design quality
+18. Testability
+19. Observability and diagnosability
+20. Localization and string handling
+21. Backward compatibility and migration safety
+22. Accessibility and UX robustness
+23. Rollout safety
+24. Long-term maintainability
 
 ---
 
-## Core architectural rules
+## Core review rules
 
 ### 1. Keep business logic out of UI
+
 Business logic should live primarily in domain/use-case/domain model layers, not in composables and not scattered through ViewModels.
 
 Flag and fix cases where:
@@ -85,6 +87,7 @@ Prefer:
 - repository interfaces returning app-oriented models, not raw transport models where avoidable
 
 ### 2. Avoid large ViewModels
+
 A ViewModel should orchestrate state, not become the system.
 
 Flag and fix ViewModels that:
@@ -102,7 +105,8 @@ When reviewing ViewModels:
 - extract reusable state logic where appropriate
 - keep the ViewModel focused on intent handling, state exposure, and coordination
 
-### 3. Separation of concerns
+### 3. Separation of concerns and project pattern fit
+
 Check that responsibilities are cleanly separated across:
 - UI / presentation
 - state holder / ViewModel / presenter
@@ -112,16 +116,15 @@ Check that responsibilities are cleanly separated across:
 - navigation
 - design-system reusable components
 
-Reject implementations that introduce parallel architectures or blur module boundaries.
-
-### 4. Preserve module boundaries
-Do not allow shortcuts that violate feature boundaries, shared UI boundaries, or data/domain layering.
-
 Watch for:
 - feature modules reaching into each other improperly
 - UI code directly depending on transport/network models
 - shared abstractions being bypassed
 - platform-specific code leaking into common code without a good reason
+- helper code copied into feature modules instead of reused from the correct shared location
+- local changes that quietly introduce a competing pattern
+
+Prefer review against the existing project architecture, not an imaginary rewrite. Flag meaningful drift, but prefer incremental improvements over speculative redesign.
 
 ---
 
@@ -145,6 +148,12 @@ Prefer:
 - explicit mappers/adapters in predictable locations
 - clear ownership of mapping logic
 
+Also review whether:
+- nullability is modeled intentionally
+- optional fields are handled in the right layer
+- unknown enum or backend values are tolerated where appropriate
+- conversion between models is testable and discoverable
+
 ---
 
 ## State management correctness
@@ -160,6 +169,7 @@ Flag:
 - ad hoc mutation patterns that are hard to reason about
 - state models that mix durable UI state with transient navigation/toast/snackbar effects
 - partial updates that can produce invalid state
+- mutable state leaked beyond its owner
 
 Prefer:
 - explicit state models
@@ -167,6 +177,13 @@ Prefer:
 - clear separation between durable UI state and transient effects
 - reducers/state transformers where complexity justifies them
 - state ownership that is easy to trace and test
+- immutable public state surfaces
+
+Review whether:
+- loading, success, empty, error, partial-data, and retry states are modeled appropriately
+- submit/refresh/load-more/restore flows can coexist safely
+- stale data and fresh data interactions are intentional
+- event-triggered state changes are deterministic
 
 ---
 
@@ -190,6 +207,11 @@ Prefer:
 - easily testable construction paths
 - narrow object lifetime where possible
 
+Also review:
+- whether dispatchers are injected where the project expects it
+- whether stateful caches, coordinators, or managers are scoped appropriately
+- whether shared instances can accidentally leak state between features or sessions
+
 ---
 
 ## Persistence, caching, and source-of-truth discipline
@@ -205,6 +227,8 @@ Flag:
 - missing invalidation or refresh logic where needed
 - local and remote state merged ad hoc in ViewModel/UI
 - persistence models used too broadly across layers
+- refresh logic that depends on hidden assumptions
+- silent fallback to stale or partial data without a visible contract
 
 Prefer:
 - explicit source-of-truth decisions
@@ -212,6 +236,13 @@ Prefer:
 - narrow persistence boundaries
 - cache behavior that is understandable and testable
 - reconciliation strategies for optimistic or partial updates
+- clear invalidation semantics
+
+Review whether:
+- retries can create duplicate writes
+- partial failures leave local state inconsistent
+- local state can be restored safely after process death if relevant
+- pagination state and cache state are coordinated sensibly
 
 ---
 
@@ -244,6 +275,13 @@ Prefer:
 - secure session cleanup and recovery behavior
 - least-privilege handling of sensitive fields
 
+Review also for:
+- stale session state after logout
+- cached privileged data remaining visible to a lower-privilege user
+- assumptions that hidden UI equals protected behavior
+- permissive WebView/navigation/deep link handling
+- unvalidated IDs or routes flowing across boundaries
+
 ---
 
 ## Shared UI system enforcement
@@ -264,8 +302,15 @@ Flag and fix:
 - hardcoded dimensions when tokens/components already exist
 - UI duplication that should be extracted into reusable components
 - mixing feature-specific styling with shared design-system responsibilities
+- ignoring existing shared layout/content/error/loading patterns
 
 When a reusable pattern appears more than once, consider extracting a component, but do not over-abstract prematurely.
+
+Review whether:
+- the code uses shared UI conventions consistently across states
+- empty/loading/error states match existing patterns
+- visual hierarchy and interaction patterns feel like the rest of the app
+- reusable UI logic is placed in the correct shared layer
 
 ---
 
@@ -278,17 +323,26 @@ Review for:
 - default text that does not match the project’s language/tone conventions
 - missing localization wiring
 - feature code with embedded labels, button text, titles, placeholders, errors, or toasts/snackbars
+- user-facing strings created in ViewModels/repositories/domain logic when they belong in presentation/resources
+- raw backend strings surfaced to users
 
 Prefer:
 - string resources
 - the project’s default product tone and language unless requirements say otherwise
 - parameterized string resources where dynamic data is involved
+- presentation-level formatting for user-facing values
+
+Review whether:
+- number/date/currency formatting is done in the correct layer
+- pluralization and parameterized messages are handled properly
+- fallback text is product-appropriate rather than developer-centric
 
 ---
 
 ## Compose review rules
 
 ### 1. Avoid unnecessary recomposition
+
 Review composables for recomposition and rendering inefficiencies.
 
 Flag and fix:
@@ -302,6 +356,7 @@ Flag and fix:
 - missing memoization where appropriate
 - derived UI data recalculated repeatedly in composition
 - unnecessary use of `collectAsState` / state observation too high in the tree
+- expensive formatting or resource selection repeated for each recomposition
 
 Check for opportunities to use:
 - smaller composables
@@ -314,6 +369,7 @@ Check for opportunities to use:
 Do not mechanically add `remember` everywhere. Only use it when it improves correctness or performance.
 
 ### 2. Side effects correctness
+
 Review use of:
 - `LaunchedEffect`
 - `DisposableEffect`
@@ -328,8 +384,11 @@ Flag:
 - collecting flows in the wrong place
 - stale captured values
 - lifecycle leaks
+- side effects coupled too tightly to rendering code
+- event consumption patterns that risk duplicate effects
 
 ### 3. Lazy layouts and lists
+
 Review lists for:
 - stable keys
 - item content separation
@@ -337,6 +396,27 @@ Review lists for:
 - missing extraction of list item composables
 - nested scrolling/performance traps
 - avoidable recomposition of whole lists
+- unstable item models
+- inline derived state repeated across rows
+
+### 4. State observation placement
+
+Review whether state is observed at the right level in the tree.
+
+Flag:
+- collecting large screen state at the top and passing broad state everywhere
+- child composables receiving more state than they need
+- direct repository or use case reads inside composables
+- UI observing raw data flows that should already be shaped by the state holder
+
+### 5. Compose API hygiene
+
+Review composable APIs for:
+- too many parameters
+- mixed concerns
+- unstable or mutable inputs
+- callbacks that are ambiguous or easy to misuse
+- booleans controlling many branches instead of clearer UI models
 
 ---
 
@@ -345,6 +425,7 @@ Review lists for:
 Be strict here.
 
 ### 1. Dispatcher/threading correctness
+
 Review whether work is executed on the correct dispatcher/thread.
 
 Flag and fix:
@@ -354,7 +435,13 @@ Flag and fix:
 - missing dispatcher injection where the project expects testable dispatching
 - accidental thread hopping that adds complexity without benefit
 
+Review whether:
+- heavy mapping or sorting is done too late in the pipeline
+- background work returns to main only where necessary
+- thread decisions are visible and testable
+
 ### 2. Cancellation correctness
+
 Review coroutine usage to ensure cancellation is handled properly.
 
 Flag:
@@ -371,12 +458,15 @@ Make sure:
 - `supervisorScope` / `coroutineScope` usage is intentional
 
 ### 3. Exception handling
+
 Review for:
 - silent failures
 - overbroad `try/catch`
 - missing recovery paths
 - mixing domain errors with transport errors with UI errors without clear mapping
 - exceptions converted to vague generic states without observability
+- blanket `runCatching` misuse that hides failure semantics
+- fallback behavior that masks real faults
 
 Prefer:
 - explicit error mapping
@@ -385,6 +475,7 @@ Prefer:
 - avoiding blanket `runCatching` misuse if it obscures failure paths
 
 ### 4. Flow and async stream correctness
+
 Review usage of:
 - `Flow`
 - `StateFlow`
@@ -397,6 +488,14 @@ Flag:
 - `stateIn` / `shareIn` misuse
 - expensive transformations duplicated across collectors
 - collecting streams in the UI when state should already be prepared in ViewModel/presenter
+- mutable streams exposed publicly
+- event streams configured in ways that risk replay bugs or dropped events
+
+Review whether:
+- stream ownership is clear
+- collector lifetimes match feature lifetimes
+- sharing policy is intentional
+- expensive upstream transformations are not repeated needlessly
 
 ---
 
@@ -413,6 +512,8 @@ Flag:
 - refresh/load interactions that can produce inconsistent UI state
 - multiple async paths updating shared state without deterministic ordering
 - retry flows that can replay destructive actions unsafely
+- latest-wins vs first-wins behavior left accidental
+- multiple requests for the same resource without coordination
 
 Prefer:
 - explicit coordination of concurrent work
@@ -421,11 +522,18 @@ Prefer:
 - deterministic state updates under concurrency
 - idempotent or safely guarded submit flows where appropriate
 
+Review whether:
+- concurrent pagination and refresh can conflict
+- optimistic UI and server confirmation can race
+- restored state can be overwritten by slow in-flight work
+- repeated navigation or effect dispatch can happen from racing state paths
+
 ---
 
 ## Reusability and file organization
 
 ### 1. Reusable components
+
 Check whether repeated UI patterns, validation rules, mappers, or helper logic should be extracted.
 
 Flag:
@@ -434,6 +542,7 @@ Flag:
 - repeated validation logic
 - ad hoc extension functions scattered in the wrong place
 - duplicated sealed state handling patterns
+- slightly different copies of the same business rule across features
 
 Prefer reusable extraction only when:
 - duplication is real
@@ -441,14 +550,32 @@ Prefer reusable extraction only when:
 - abstraction improves maintainability
 
 ### 2. Classes in their own files
+
 Classes, interfaces, mappers, validators, reducers, and reusable components should usually live in their own files when they are meaningful standalone units.
 
 Flag:
 - large files with many unrelated classes
 - nested declarations that reduce discoverability
 - helper classes buried inside large files without a strong reason
+- feature files that combine UI, mapping, and orchestration
 
 Do not split tiny private helpers into separate files unless it materially improves structure.
+
+### 3. File size and complexity
+
+Review for:
+- long files
+- long methods
+- high cyclomatic complexity
+- deep nesting
+- “private helper graveyards”
+- unclear grouping of related logic
+
+Prefer:
+- focused files
+- discoverable naming
+- cohesive grouping of responsibilities
+- extracted helpers only when they meaningfully improve structure
 
 ---
 
@@ -465,6 +592,8 @@ Flag:
 - poor naming or unclear ownership
 - function parameters that require callers to understand too much internal detail
 - extension functions in surprising or inappropriate layers
+- command/query responsibilities mixed into a single confusing API
+- callbacks whose ordering or contract is unclear
 
 Prefer:
 - narrow and intention-revealing interfaces
@@ -472,6 +601,11 @@ Prefer:
 - immutability by default
 - clear ownership and discoverability
 - APIs that are easy to call correctly and hard to misuse
+
+Review whether:
+- abstraction boundaries match real usage
+- public methods expose too many low-level details
+- naming reflects business intent rather than implementation details
 
 ---
 
@@ -518,12 +652,15 @@ Check whether the implementation should have:
 - repository tests where nontrivial mapping/orchestration exists
 - concurrency or race-condition tests where multiple async paths exist
 - serialization or parsing tests when boundary handling is important
+- snapshot/state rendering tests if the project uses them for meaningful UI states
 
 Flag:
 - logic hidden in composables that is hard to test
 - code coupled too tightly to platform APIs
 - missing abstraction seams that prevent testing
 - high-risk logic shipped without test coverage
+- no tests around failure/retry/empty/partial-data behavior
+- no tests around duplicate-action protection or race-prone flows
 
 Do not demand tests for trivial wiring, but do flag missing tests for meaningful logic.
 
@@ -542,6 +679,7 @@ Flag:
 - critical user flows with no useful diagnostic signals
 - errors swallowed without analytics, logs, or surfaced state
 - diagnostics that are impossible to correlate with the failing feature path
+- no distinction between expected degraded states and genuine faults
 
 Prefer:
 - meaningful structured logs
@@ -549,6 +687,12 @@ Prefer:
 - diagnostics around important flows
 - privacy-safe logging and analytics
 - enough context to understand failures without leaking sensitive information
+
+Review whether:
+- submit flows are traceable
+- retry/failure states can be correlated with logs
+- analytics events avoid leaking sensitive payloads
+- production failures can be tied back to a specific feature path
 
 ---
 
@@ -562,6 +706,13 @@ Check that:
 - role/permission/session-dependent behavior is not assumed blindly
 - optimistic assumptions about backend fields are avoided
 - nullability is handled intentionally, not defensively everywhere
+- effect dispatch does not create duplicate navigation or repeated snackbars
+
+Flag:
+- navigation logic mixed unpredictably across UI and state holder
+- brittle route assumptions
+- state transitions that can trigger duplicate navigation
+- UI paths that assume backend completeness
 
 ---
 
@@ -577,6 +728,8 @@ Flag:
 - non-defensive parsing of backend responses
 - assumptions that all clients/backends are upgraded simultaneously
 - logic that breaks when unknown enum values or new fields appear
+- all-or-nothing rollout assumptions
+- old cached state that becomes unreadable or misinterpreted
 
 Prefer:
 - tolerant readers where appropriate
@@ -584,6 +737,11 @@ Prefer:
 - rollout-safe behavior
 - migration-aware persistence changes
 - defensive parsing at boundaries
+
+Review whether:
+- fallback behavior is defined for new/unknown backend values
+- feature flags or capability checks degrade safely
+- storage changes require migration paths
 
 ---
 
@@ -600,12 +758,15 @@ Flag:
 - retry/recovery paths that are missing or unclear
 - confusing disabled states
 - degraded-state UX that leaves the user stuck without guidance
+- no distinction between “no data yet” and “failed to load”
+- inaccessible click targets or semantics where the platform supports better patterns
 
 Prefer:
 - explicit user feedback
 - resilient degraded-state UX
 - accessible semantics where supported by the platform/pattern
 - clear retry and recovery behavior
+- recoverable user paths under partial backend failure
 
 ---
 
@@ -619,12 +780,15 @@ Flag:
 - no clear isolation for risky new flows
 - assumptions that everything is enabled simultaneously
 - code paths that cannot degrade safely if partial rollout occurs
+- no capability checks where the backend may lag behind the client
+- new flows tightly coupled to unrelated existing flows
 
 Prefer:
 - graceful degradation
 - clear feature boundaries
 - rollout-safe assumptions
 - safe handling of partially available functionality
+- explicit feature capability handling where relevant
 
 ---
 
@@ -639,6 +803,10 @@ Because this is a KMP project, check for:
 - threading assumptions that do not hold well across targets
 - shared code using APIs that complicate testing or platform compatibility
 - platform differences hidden in ways that make behavior hard to reason about
+- shared logic depending indirectly on platform-only behavior
+- platform abstractions that are too wide or too leaky
+
+If the implementation starts changing source-set placement, shared-vs-platform ownership, or target-specific architectural boundaries, say that the change should also be reviewed with `kotlin-project-architecture-review`.
 
 ---
 
@@ -652,6 +820,7 @@ Flag:
 - surprising constraints hidden in implementation details
 - high-value architectural choices that are undocumented
 - naming that makes responsibilities or ownership hard to discover
+- behavior that depends on invariants not visible at call sites
 
 Prefer:
 - concise comments for non-obvious decisions
@@ -663,19 +832,18 @@ Prefer:
 
 ## How to conduct the review
 
-Follow this process:
-
 ### Step 1: Understand the change
-Before suggesting fixes:
-- identify which feature/module changed
-- identify the architectural path of the feature
-- identify what responsibilities are present
-- identify where business logic is currently placed
-- identify whether the implementation fits existing patterns
-- identify risk areas for security, concurrency, persistence, and maintainability
+Identify:
+- which feature/module changed
+- the architectural path of the feature
+- what responsibilities are present
+- where business logic is currently placed
+- whether the implementation fits existing patterns
+- the risk areas for security, concurrency, persistence, and maintainability
+- whether the change is local implementation work or is pushing into structural architecture territory
 
 ### Step 2: Review in categories
-Review at minimum these categories:
+Review at minimum:
 1. Architecture / layering
 2. ViewModel size and responsibilities
 3. Domain/business logic placement
@@ -692,11 +860,12 @@ Review at minimum these categories:
 14. Internal API quality
 15. Testability and tests
 16. Observability/diagnostics
-17. Lint/static-analysis quality
+17. Static-analysis quality
 18. Localization / strings
 19. Backward compatibility / migration safety
 20. Accessibility / UX robustness
 21. Rollout safety
+22. KMP portability / shared-vs-platform concerns
 
 ### Step 3: Prefer minimal, high-value fixes
 Do not rewrite the entire feature unless the implementation is fundamentally broken.
@@ -712,21 +881,33 @@ Prefer:
 - strengthening security and trust-boundary handling
 - improving resilience under partial data, retries, and race conditions
 
-### Step 4: Summarize findings clearly
-When reporting or reviewing, structure the output as:
+### Step 4: Escalate structural issues when needed
+If the implementation appears to materially change:
+- module boundaries
+- source-set placement
+- shared vs platform boundaries
+- navigation architecture
+- manifest/exported entry points
+- Android entry-point ownership
+- feature-level source of truth ownership
 
-1. **High-risk issues**
-2. **Security and privacy issues**
-3. **Architectural issues**
-4. **State/model boundary issues**
-5. **Performance issues**
-6. **Coroutine/threading/concurrency issues**
-7. **Persistence/source-of-truth issues**
-8. **UI/design-system issues**
-9. **Maintainability issues**
-10. **Test gaps**
-11. **Suggested fixes**
-12. **Optional follow-up refactors**
+then state clearly that the PR/code review should also be evaluated with `kotlin-project-architecture-review`.
+
+### Step 5: Summarize findings clearly
+When reporting or reviewing, structure the output as:
+1. High-risk issues
+2. Security and privacy issues
+3. Architectural issues
+4. State/model boundary issues
+5. Performance issues
+6. Coroutine/threading/concurrency issues
+7. Persistence/source-of-truth issues
+8. UI/design-system/localization issues
+9. Maintainability issues
+10. Test gaps
+11. Suggested fixes
+12. Optional follow-up refactors
+13. Whether architecture-review escalation is needed
 
 Be explicit about severity and impact.
 
@@ -742,12 +923,12 @@ If asked to apply fixes:
 - do not create abstractions that are more complex than the problem
 - prefer incremental improvement
 - do not weaken security, observability, or testability for the sake of brevity
+- if a structural issue exists, fix locally where possible but explicitly call out larger architectural follow-up separately
 
 ---
 
 ## Anti-patterns to flag aggressively
 
-Flag these aggressively:
 - massive ViewModels
 - business logic in composables
 - business logic heavily embedded in ViewModels
@@ -773,6 +954,7 @@ Flag these aggressively:
 - brittle parsing or schema assumptions
 - APIs that are easy to misuse
 - hidden state transitions or replay-prone transient events
+- local implementation changes that quietly introduce architecture drift
 
 ---
 
@@ -792,5 +974,4 @@ Be strict about:
 - diagnosability
 - rollout safety
 
-Do not optimize for politeness.
 Optimize for protecting the codebase.
