@@ -1,7 +1,7 @@
 <div align="center">
 <img src="https://upload.wikimedia.org/wikipedia/commons/7/74/Kotlin_Icon.png" alt="Kotlin" width="80" />
 
-# Kotlin KMP Agent Skills
+# Kotlin KMP Claude Agent Skills
 
 **A public catalog of AI agent skills for Kotlin Multiplatform projects.**
 
